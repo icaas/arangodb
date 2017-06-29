@@ -399,18 +399,37 @@ function ClusterCollectionSuite () {
       db._query(`FOR x IN @@cn REMOVE x IN @@cn`, {'@cn': cn});
       assertEqual(0, c.toArray().length);
 
-      // store (in subquery) document
-      // we insert one document here and expert that exactly this
-      // document is stored
-      db._query(`
-                let x = (FOR a IN [1]
-                         INSERT {
-                           "foo": "bar"
-                         } IN @@cn)
-                return x`,
-                {'@cn' : cn});
-
+      //insert
+      var cursor = db._query(`
+        let x = (FOR a IN [1]
+                 INSERT {
+                   "_key" : "ulf",
+                   "super" : "dog"
+                 } IN @@cn)
+        return x`,
+        {'@cn' : cn});
       assertEqual(1, c.toArray().length);
+
+      //update
+      cursor = db._query(`
+        let x = (UPDATE 'ulf' WITH {
+                   "super" : "cat"
+                 } IN @@cn RETURN NEW)
+        RETURN x`,
+        {'@cn' : cn});
+      assertEqual(1, c.toArray().length);
+      var doc = c.any();
+      assertTrue(doc.super === "cat");
+      doc = cursor.next();                // should be: cursor >>= id
+      assertTrue(doc[0].super === "cat");  // extra [] buy subquery return
+
+      //remove
+      cursor = db._query(`
+        let x = (REMOVE 'ulf' IN @@cn)
+        return x`,
+        {'@cn' : cn});
+      assertEqual(0, c.toArray().length);
+
       db._drop(cn);
     }
 
